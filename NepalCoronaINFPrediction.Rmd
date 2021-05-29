@@ -1,0 +1,342 @@
+---
+title: "Prediction for Possible Daily New Cases of Corona Infection"
+auther: "R.K.Mallik PhD Condidate Civil Engineering,IOE Pulchowk Campus "
+output:
+  html_document: default
+  pdf_document: default
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+R.K.Mallik PhD Condidate Civil Engineering,IOE Pulchowk Campus
+
+### Import the Important Library
+```{r import libraries}
+library(plotly)
+library(TTR)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(forecast)
+```
+### Reading Data
+```{r read csv file}
+coronaCases<-read.csv(file = "coronaNepal1.csv")
+data1<-data.frame(coronaCases)
+str(data1)
+y<-data1$NewCases
+length(y)
+total_cases<-cumsum(y)
+length(total_cases)
+```
+### Creating Time Series File for the Observations
+```{r}
+corona_ts<-ts(y,frequency=1)
+total_cases_ts<-ts(total_cases,frequency=1)
+corona_ts
+time(corona_ts)
+plot(corona_ts)
+acf(corona_ts)
+plot(diff(corona_ts))
+acf(diff(corona_ts))
+```
+### Creating List of date corresponding to observations
+```{r}
+today <- Sys.Date()
+tm <- seq(0,length(y)-1, by = +1)
+x <- as.Date("2020-04-1") + tm
+x
+
+```
+
+### Ploting observations vs date in plotly package
+```{r using plotly for ploting observed data}
+plot_ly(x = ~x, y = ~y,
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'No of New Cases',
+        main = 'Corona Daily Infection Observations',
+        text = paste(today-x, "days from today"))
+
+plot_ly(x = ~x, y = ~cumsum(y),
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'Cumulative Cases',
+        main = 'Corona Cumulative Cases Of Infection',
+        text = paste(today-x, "days from today"))
+```
+
+
+### Isolating Oscillating part from the observed data
+```{r}
+corona_ts_noise = diff(corona_ts)
+z_n<-corona_ts_noise
+z_n
+today <- Sys.Date()
+tm <- seq(1,length(y)-1, by = +1)
+tm
+x <- as.Date("2020-04-1") + tm
+plot_ly(x = ~x, y = z_n,
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'No of New Cases',
+        main = 'noise from the daily Observations data',
+        text = paste(today-x, "days from today"))
+plot_ly(x = ~x, y = cumsum(z_n),
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'Cumulative Noise Cases',
+        main = 'noise from Cumulative cases of data',
+        text = paste(today-x, "days from today"))
+```
+
+
+### Isolating Trend part from the observation
+```{r}
+corona_ts_trend<-corona_ts-corona_ts_noise
+z_t<-corona_ts_trend
+plot_ly(x = ~x, y = z_t,
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'No of New Cases(Trend)',
+        main = 'Trend part of the Daily Corona Infections',
+        text = paste(today-x, "days from today"))
+plot_ly(x = ~x, y = cumsum(z_t),
+        mode = 'line',
+        xlab = 'Date',
+        ylab = 'Cumulative No of Cases(Trend)',
+        main = 'Trend part of the Cumulative Corona Infections',
+        text = paste(today-x, "days from today"))
+```
+### DECOMPOSE TIME SERIES INTO TREND AND NOISE
+```{r}
+#corona_ts_decompose<-decompose(corona_ts)
+
+```
+### HOLTWINTER FORECASTING 
+```{r}
+plot(corona_ts,main="Daily New Cases of Corona Infection")
+acf(corona_ts,main="ACF of Daily New Cases")
+acf(corona_ts,type="partial",main="PACF of Daily New Cases of Infection")
+corona_ts_forecasts_hw <- HoltWinters(corona_ts,gamma=FALSE)
+# beta= trend, gamma=Seasionality
+corona_ts_forecasts_hw
+corona_ts_forecasts_hw$fitted
+plot(corona_ts_forecasts_hw,main='Nepal,Daily New Cases Observation vs Fitted Model',
+     xlab = 'Date Count starts from April,2,2020',
+     ylab ='Daily New Cases of Corona Infection')
+corona_ts_forecasts_hw$SSE
+
+# Total Cases
+
+corona_ts_forecasts_total_cases_hw <- HoltWinters(total_cases_ts,gamma=FALSE)
+corona_ts_forecasts_total_cases_hw
+corona_ts_forecasts_total_cases_hw$fitted
+plot(corona_ts_forecasts_total_cases_hw,main='Nepal,Cumulative Cases Observation vs Fitted Model',
+     xlab = 'Date Count starts from April,2,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+corona_ts_forecasts_total_cases_hw$SSE
+
+```
+
+### ONE WEEAK FORCASTED DATA
+```{r}
+library("forecast")
+corona_ts_forecasts_hw2 <- forecast(corona_ts_forecasts_hw,h=8)
+corona_ts_forecasts_hw2
+
+plot(corona_ts_forecasts_hw2,main='Arima Model Forecast for one Week(6 June to 13 June)',
+                xlab = 'Date Count starts from April,2,2020',
+                ylab ='Daily New Cases of Corona Infection')
+acf(corona_ts_forecasts_hw2)
+# Total Cases
+corona_ts_forecasts_total_cases_hw2 <- forecast(corona_ts_forecasts_total_cases_hw,h=30)
+corona_ts_forecasts_total_cases_hw2
+plot(corona_ts_forecasts_total_cases_hw2,main='HotWinter Model Forecast for one Week(6 June to 13 June)',
+                xlab = 'Date Count starts from April,2,2020',
+                ylab ='Cumulative Cases of Corona Infection')
+```
+
+### Plotting Residulas and lag
+```{r}
+acf(corona_ts_forecasts_hw2,lag.max=20)
+plot.ts(corona_ts_forecasts_hw2$residuals)
+```
+### HOLT'S EXPONENTIAL SMOOTHING
+```{r}
+corona_ts_forecasts_exp <- HoltWinters(corona_ts,gamma=FALSE)
+corona_ts_forecasts_exp
+corona_ts_forecasts_exp$fitted
+plot(corona_ts_forecasts_exp,main='Holts Exponential Model',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Daily New Cases of Corona Infection')
+
+corona_ts_forecasts_exp$SSE
+
+# Total Cases..
+corona_ts_forecasts_total_cases_exp <- HoltWinters(total_cases_ts,gamma=FALSE)
+corona_ts_forecasts_total_cases_exp
+corona_ts_forecasts_total_cases_exp$fitted
+plot(corona_ts_forecasts_total_cases_exp,main='Holts Exponential Model',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+
+```
+### FORCASTED DATA CORRESPONDING TO EXPONENTIAL MODEL
+```{r}
+corona_ts_forecasts_exp2 <- forecast(corona_ts_forecasts_exp,h=8)
+corona_ts_forecasts_exp2
+plot(corona_ts_forecasts_exp2,main='Exponential Model Forecast for one Week(9June to 16 June)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Daily New Cases of Corona Infection')
+
+acf(corona_ts_forecasts_exp2,lag.max=20)
+Box.test(corona_ts_forecasts_exp2$residuals,lag=20,type='Ljung-Box')
+plot.ts(corona_ts_forecasts_exp2$residuals)
+
+# Total Cases Fore cast for one week
+corona_ts_forecasts_total_cases_exp2 <- forecast(corona_ts_forecasts_total_cases_exp,h=8)
+corona_ts_forecasts_total_cases_exp2
+plot(corona_ts_forecasts_total_cases_exp2,main='Exponential Model Forecast for one Week(9June to 16 June)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+
+# Total Cases Fore cast for one month
+corona_ts_forecasts_total_cases_exp2_month <- forecast(corona_ts_forecasts_total_cases_exp,h=30)
+corona_ts_forecasts_total_cases_exp2_month
+plot(corona_ts_forecasts_total_cases_exp2_month,main='Exponential Model Forecast for one Month(6June to 6 July)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+# Total Cases Fore cast for two month
+corona_ts_forecasts_total_cases_exp2_month <- forecast(corona_ts_forecasts_total_cases_exp,h=90)
+corona_ts_forecasts_total_cases_exp2_month
+plot(corona_ts_forecasts_total_cases_exp2_month,main='Exponential Model Forecast for one Week(6June to 6 September)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+
+```
+
+### EXTENDING EXPONENTIAL MODEL TO PREDICT SATURATION LEVEL
+```{r}
+today <- Sys.Date()
+tm <- seq(0,length(y)-1, by = +1)
+x <- as.Date("2020-04-1") + tm
+x
+length(total_cases)
+data2<-data.frame(x,total_cases)
+ggplot(data2,aes(x=x,y=total_cases/3000))+geom_point()+
+  stat_smooth(method="glm",method.args=list(family="binomial"),se=FALSE)
+#par(mar=c(4,4,1,1))
+#plot(data2$x,data2$total_cases)
+
+
+```
+
+
+
+#```{r}
+# Assume effective time between generations
+#t = 3
+# Cumulative Data Ponts after gap of t days
+#total_cases
+#for (i in 1:length(total_cases)){
+#  total_slope[i] <- total_cases[i+1]-total_cases[i]
+#}
+#total_slope
+#for (i in seq(length(total_cases),2,by=-t)){
+#  theta[i]<-(1/t)*log(total_cases[i]/total_cases[i-t])
+#  
+#}
+#theta
+#theta1<-na.omit(theta)
+#theta1
+#theta2<-mean(theta1)
+#theta2
+# Saturation Value
+#t = 1:length(total_cases)
+#M<-total_cases/(1-total_cases*exp(theta1*t))
+#M = 10000
+#no = 1
+#Nt<-M/(1+((M-no)/no)*exp(-theta2*t))
+#Nt
+#plot(t,Nt)
+#```
+
+## ARIMA MODEL 
+```{r}
+diff_corona_ts<-diff(corona_ts)
+plot(diff_corona_ts)
+acf(diff_corona_ts)
+pacf(diff_corona_ts)
+# automatic selection of p,d,andq
+auto.arima(diff_corona_ts)
+corona_ts_arima<-arima(diff_corona_ts,order=c(2,0,2))
+
+
+library(forecast)
+# Weekly Forecast
+corona_ts_arima<-arima(corona_ts,order=c(2,1,2))
+corona_ts_arima_forecast<-forecast(corona_ts_arima)
+corona_ts_arima_forecast
+
+plot(corona_ts_arima_forecast,
+     xlab='Date Counts from April,01,2020',
+     ylab='Expected Daily New Cases',
+     main='ARIMA Model for the prediction from 9 June to 16 June')
+
+# Monthly Forecast
+# Total Cases...
+
+auto.arima(total_cases_ts)
+corona_ts_arima_total<-arima(total_cases_ts,order=c(3,2,1))
+corona_ts_arima_total
+
+
+corona_ts_arima_forecast_total<-forecast(corona_ts_arima_total,h=30)
+corona_ts_arima_forecast_total
+
+plot(corona_ts_arima_forecast_total,
+     xlab='Date Counts from April,01,2020',
+     ylab='Cumulative Cases',
+     main='ARIMA Model for the prediction from 6 June to 6 July')
+# Three Month Forcast
+corona_ts_arima_forecast_total<-forecast(corona_ts_arima_total,h=90)
+corona_ts_arima_forecast_total
+
+plot(corona_ts_arima_forecast_total,
+     xlab='Date Counts from April,01,2020',
+     ylab='Cumulative Cases',
+     main='ARIMA Model for the prediction from 6 June to 6 August')
+
+```
+
+
+### CONCLUSION FROM EXPONENTIAL MODEL
+
+The prediction most likely to follow in between Lo95% to Hi95% Output
+Date count starts from 2 June.....
+```{r}
+## One Week Daily New Cases
+corona_ts_forecasts_exp2
+plot(corona_ts_forecasts_exp2,main='Exponential Model Forecast for one Week(6June to 13 June)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Daily New Cases of Corona Infection')
+## One Week Cumulative Cases
+corona_ts_forecasts_total_cases_exp2
+plot(corona_ts_forecasts_total_cases_exp2,main='Exponential Model Forecast for one Week(9June to 16 June)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+
+#Total Cases for the month
+corona_ts_forecasts_total_cases_exp2_month
+plot(corona_ts_forecasts_total_cases_exp2_month,main='Exponential Model Forecast for one Week(6June to 6 August)',
+     xlab = 'Date Count starts from April1,2020',
+     ylab ='Cumulative Cases of Corona Infection')
+
+
+
+```
